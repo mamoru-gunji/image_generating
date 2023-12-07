@@ -2,22 +2,32 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow.keras import layers, models
+import colorsys
+
+def hsv_to_rgb(h, s, v):
+    return tuple(round(i*(2**16 - 1)) for i in colorsys.hsv_to_rgb(h, s, v))
+
+row = 45
+col = 15
 
 # ダミーデータ生成
 def generate_images(input_params):
     # XYZ値の生成則に基づき、各ピクセルごとにダミー画像を生成
     images = []
     for params in input_params:
-        image = np.zeros((10, 10, 3))  # 10x10ピクセルのRGB画像
+        image = np.zeros((row, col, 3))  # 10x10ピクセルのRGB画像
         temperature, humidity, speed = params
 
         # 仮の生成則：各ピクセルのRGB値を入力パラメータから計算（実際の生成則に置き換えてください）
+        alpha = [0.3,0.3,0.4,0.8,0.4,-0.2,0.3,1.1,-0.4]
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
-                r = temperature + np.random.normal(0, 0.01)
-                g = humidity + np.random.normal(0, 0.01)
-                b = speed + np.random.normal(0, 0.01)
-                image[i, j] = [r, g, b]
+                h = alpha[0]*temperature + alpha[1]*humidity + alpha[2]*speed + np.random.normal(0, 0.001)
+                s = alpha[3]*temperature + alpha[4]*humidity + alpha[5]*speed + np.random.normal(0, 0.01)
+                v = alpha[6]*temperature + alpha[7]*humidity + alpha[8]*speed + np.random.normal(0, 0.01)
+                r, g, b = hsv_to_rgb(h, s, v)
+
+                image[i, j] = [r/2**16, g/2**16, b/2**16]
 
         images.append(image)
     return np.array(images)
@@ -27,8 +37,8 @@ def create_model():
     model = models.Sequential()
     model.add(layers.Dense(128, activation='relu', input_shape=(3,)))
     model.add(layers.Dense(256, activation='relu'))
-    model.add(layers.Dense(10 * 10 * 3, activation='sigmoid'))  # Flatten the output
-    model.add(layers.Reshape((10, 10, 3)))  # Reshape to match image dimensions
+    model.add(layers.Dense(row * col * 3, activation='sigmoid'))  # Flatten the output
+    model.add(layers.Reshape((row, col, 3)))  # Reshape to match image dimensions
     return model
 
 # ロス関数の定義
@@ -83,7 +93,7 @@ def compare_scatter(input_params, true_images, model):
         axes[2].set_xlabel('X')
         axes[2].set_ylabel('Y')
         axes[2].legend()
-
+        plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
         plt.show()
 
 # メインプロセス
@@ -98,13 +108,13 @@ if __name__ == "__main__":
 
     # モデルの訓練
     model.compile(optimizer='adam', loss=custom_rmse_loss)
-    history = model.fit(input_params, true_images, epochs=50, validation_split=0.2, verbose=1)
+    history = model.fit(input_params, true_images, epochs=100, validation_split=0.2, verbose=1)
 
     # ロスの可視化
     plot_loss(history)
 
     # 学習結果の検証
-    compare_images(model, input_params[:5], true_images[:5])
-    
+    # compare_images(model, input_params[:5], true_images[:5])
+
     # XY値の散布図の比較
-    compare_scatter(input_params, true_images, model)
+    compare_scatter(input_params[:100], true_images[:100], model)
